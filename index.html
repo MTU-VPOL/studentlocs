@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.30/"></script>
+    <script type="module" src="https://js.arcgis.com/map-components/4.30/arcgis-map-components.esm.js"></script>
+
+    <title>Where MTU 2024 Freshman are From</title>
+
+    <style>
+       /* :root {
+            --ion-background-color: radial-gradient(circle at 10% 20%, rgb(69, 86, 102) 0%, rgb(34, 34, 34) 90%);
+        }
+*/
+       html,
+       body,
+       #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+       }  
+
+       .pulse2 {
+            width: 40px;
+            height: 40px;
+            background: #facd01;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            animation: pulsate 1s ease-out infinite;
+        }
+
+        @keyframes pulsate {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+
+         @keyframes pulse-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+         #animation-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            pointer-events: none; /* Allow clicks to pass through */
+        }
+
+        .pulse {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 206, 0, 0.5);
+            transform: scale(0);
+            animation: pulse-animation 0.6s ease-out;
+        }
+
+        @keyframes pulse-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Custom CSS for round zoom controls */
+        .esri-widget {
+          background-color: rgba(0,0,0,0) !important;
+          box-shadow: 0 2px 4px rgba(0,0,0,0) !important;
+        }
+
+        .esri-widget--button {
+          background-color: none; /* Set background color */          
+          border-radius: 100%; /* Make them round */
+          width: 50px; /* Width of the button */
+          height: 50px; /* Height of the button */
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Add shadow */
+          margin: 10px; /* Margin between buttons */
+          padding: 0;
+        }
+
+        .esri-widget--button .esri-icon {
+            margin: 0; /* Center the icon */
+            font-size: 40px; /* Size of the icon */
+            font-weight: 700;
+            color: #0079c1; /* Icon color */
+        }
+
+       .esri-view .esri-view-surface--touch-none:focus::after {
+          outline: none !important;
+        }
+
+        .alert-wrapper.sc-ion-alert-md {
+            
+        }
+    </style>
+
+    <script>
+        // ** Tap/click pulse animation ** //
+        document.addEventListener('click', function(e) {
+            var animationContainer = document.getElementById('animation-container');
+
+            // Create a new div element for the pulse
+            var pulse = document.createElement('div');
+            pulse.classList.add('pulse');
+
+            // Set the position of the pulse
+            pulse.style.left = e.clientX + 'px';
+            pulse.style.top = e.clientY + 'px';
+            pulse.style.width = '50px';
+            pulse.style.height = '50px';
+
+            // Append the pulse to the container
+            animationContainer.appendChild(pulse);
+
+            // Remove the pulse after the animation completes
+            pulse.addEventListener('animationend', function() {
+                pulse.remove();
+            });
+
+            // Handle ion-card elements with onclick handlers
+            let target = e.target;
+            let clickableElement = null;          
+
+            /*// Traverse up the DOM to find the closest ion-card element with an onclick attribute
+            while (target) {
+                if (target.tagName && target.tagName() === 'viewDiv') {
+                    clickableElement = target;
+                    break;
+                }
+                target = target.parentElement;
+            }*/
+
+            // Execute the onclick attribute after a short delay
+            if (clickableElement) {
+                e.preventDefault();
+                const onClickAttr = clickableElement.getAttribute('onclick');
+                setTimeout(() => {
+                    eval(onClickAttr);
+                }, 300);  // Adjust the delay as needed for the pulse animation to be visible
+            }
+        });
+        // ** Esri web map ** //
+        require(["esri/config",
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/Graphic",
+            "esri/geometry/Point",
+            "esri/symbols/SimpleMarkerSymbol",
+            "esri/layers/GraphicsLayer",
+            "esri/layers/FeatureLayer",
+            "esri/widgets/CoordinateConversion",
+            "esri/symbols/TextSymbol"], function(esriConfig, Map, MapView, Graphic, Point, SimpleMarkerSymbol, GraphicsLayer, FeatureLayer, CoordinateConversion, TextSymbol) {
+       
+            const toast = document.querySelector('ion-toast');
+            const alert = document.querySelector('ion-alert');
+
+            alert.buttons = [
+                {
+                  text: 'Cancel',
+                  role: 'cancel',
+                  handler: () => {
+                    console.log('Alert canceled');
+                  },
+                },
+                {
+                  text: 'OK',
+                  role: 'confirm',
+                  handler: () => {
+                    console.log('Alert confirmed');
+                  },
+                },
+            ];
+
+            const map = new Map({
+              basemap: "dark-gray-vector" // basemap styles service
+            });
+
+            const view = new MapView({
+              map: map,
+              center: [0, 0], // Longitude, latitude
+              zoom: 2, // Zoom level
+              container: "viewDiv" // Div element
+            });
+
+            // Add the feature layer for the student locations
+            var studentsLayer = new FeatureLayer({
+              url: "https://services2.arcgis.com/RPhrOu9XQzI31xTa/arcgis/rest/services/Student_locations_2014/FeatureServer/0"
+            });
+
+            // Add the feature layer to the map
+            map.add(studentsLayer);
+             const graphicsLayer = new GraphicsLayer();
+                map.add(graphicsLayer);
+
+                const point = new Point({
+                    longitude: -88.5479414145194,
+                    latitude: 47.1186377721938,
+                    spatialReference:{
+                      wkid: 4326
+                    }
+                }); 
+
+                const markerSymbol = new SimpleMarkerSymbol({
+                    color: [250, 205, 1, 1],
+                    size: "20px",
+                    outline: {
+                        color: [255, 255, 255, 1],
+                        width: 2
+                    }
+                });
+
+                const pointGraphic = new Graphic({
+                    geometry: point,
+                    symbol: markerSymbol                
+                });
+
+                graphicsLayer.add(pointGraphic);
+
+                // Add a div element for the pulsing effect
+                const pulseDiv = document.createElement("div");
+                pulseDiv.className = "pulse2";
+                view.ui.add(pulseDiv, "manual");
+
+                // Update the position of the pulseDiv on view changes
+                view.watch("extent", () => {
+                    const screenPoint = view.toScreen(point);
+                    const offsetX = -20; // Adjust this value to move slightly to the left
+                    const offsetY = -20; // Adjust this value to move slightly up
+                    pulseDiv.style.left = `${screenPoint.x + offsetX}px`;
+                    pulseDiv.style.top = `${screenPoint.y + offsetY}px`;
+                });
+
+                // Create a text symbol for the label
+                const textSymbol = new TextSymbol({
+                    text: "You are here!",
+                    color: "black",
+                    haloColor: "white",
+                    haloSize: "1px",
+                    font: {
+                        size: 12,
+                        family: "sans-serif",
+                        weight: "bold"
+                    },
+                    yoffset: 20  // Adjust the offset to position the label above the marker
+                });
+
+                // Create a graphic for the label and add the point and text symbol to it
+                const labelGraphic = new Graphic({
+                    geometry: point,
+                    symbol: textSymbol
+                });
+
+                // Add the label graphic to the graphics layer
+                graphicsLayer.add(labelGraphic);
+
+                $("#addloc").click(function(){ 
+                  toast.isOpen = true;
+                  // Add event listener for the "hold" event and keep a reference to the handler
+                  var holdEventHandler = view.on("hold", handleHoldEvent);
+                  function handleHoldEvent(evt) {                
+                    var lat = evt.mapPoint.latitude
+                    var lon = evt.mapPoint.longitude    
+
+                    // Create a point geometry
+                    var point = new Point({
+                      latitude: lat,
+                      longitude: lon
+                    }); 
+
+                     // Create the attributes for the new feature
+                    var attributes = {
+                      studyyear: 2024
+                    };
+
+                    // Create the new feature
+                    var newFeature = new Graphic({
+                      geometry: point,
+                      attributes: attributes
+                    });
+
+                    // Use applyEdits to add the new feature to the feature layer
+                    studentsLayer.applyEdits({
+                      addFeatures: [newFeature]
+                    }).then(function(result) {
+                      if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
+                        console.log("Feature added successfully!");
+                        toast.isOpen = false;
+                        alert.isOpen = true;
+
+                        // Refresh the feature layer to show the new feature
+                        studentsLayer.refresh();
+
+                        // Remove the hold event listener
+                        holdEventHandler.remove();
+                      } else {
+                        console.error("Error adding feature:", result.addFeatureResults[0].error);
+                      }
+                    }).catch(function(error) {
+                      console.error("Error applying edits:", error);
+                    });
+                  }
+                });
+                
+              toast.addEventListener('didDismiss', () => {
+                toast.isOpen = false;
+              });
+
+              alert.addEventListener('ionAlertDidDismiss', () => {
+                alert.isOpen = false;
+              });
+      });
+    </script>
+</head>
+<body>     
+    <ion-app>       
+     <div id="animation-container"></div>       
+        <ion-header>
+            <ion-toolbar color="dark">
+                 <ion-buttons slot="start">
+                    <ion-img src="vpoldark.jpg" style="width: 60px; height: 60px;"></ion-img>
+                </ion-buttons>  
+                <ion-title>Where our Incoming Freshman Are From</ion-title>
+            </ion-toolbar>
+        </ion-header>
+        <ion-content>           
+            <div id="viewDiv"></div> 
+            <ion-toast duration="5000000" message="Press and hold on your home location on the map to drop a pin." icon="location" position="top" color="danger"></ion-toast>  
+            <ion-alert header="Success! Your home location has been added to the map."></ion-alert> 
+             <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+                <ion-fab-button color="danger" id="addloc">
+                  <ion-icon name="location" size="large"></ion-icon>
+                </ion-fab-button>
+            </ion-fab>          
+            <ion-fab>
+         
+        </ion-content>
+    </ion-app>
+</body>
+</html>
