@@ -203,132 +203,149 @@
               container: "viewDiv" // Div element
             });
 
+            const simpleMarkerSymbol = {
+              type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
+              path: "M12 0C5.373 0 0 5.373 0 12C0 22.725 12 36 12 36C12 36 24 22.725 24 12C24 5.373 18.627 0 12 0Z",
+              color: "#23aae2",
+              outline: {
+                color: "white",
+                width: 2
+              },
+              size: "24px",
+            };
+
+            const pin = {
+              type: "simple",
+              symbol: simpleMarkerSymbol
+            };
+
             // Add the feature layer for the student locations
             var studentsLayer = new FeatureLayer({
-              url: "https://services2.arcgis.com/RPhrOu9XQzI31xTa/arcgis/rest/services/Student_locations_2014/FeatureServer/0"
+              url: "https://services2.arcgis.com/RPhrOu9XQzI31xTa/arcgis/rest/services/Student_locations_2014/FeatureServer/0",
+              renderer: pin
             });
 
             // Add the feature layer to the map
             map.add(studentsLayer);
-             const graphicsLayer = new GraphicsLayer();
-                map.add(graphicsLayer);
+            const graphicsLayer = new GraphicsLayer();
+            map.add(graphicsLayer);
 
-                const point = new Point({
-                    longitude: -88.5479414145194,
-                    latitude: 47.1186377721938,
-                    spatialReference:{
-                      wkid: 4326
-                    }
+            const point = new Point({
+                longitude: -88.5479414145194,
+                latitude: 47.1186377721938,
+                spatialReference:{
+                  wkid: 4326
+                }
+            }); 
+
+            const markerSymbol = new SimpleMarkerSymbol({
+                color: [250, 205, 1, 1],
+                size: "20px",
+                outline: {
+                    color: [255, 255, 255, 1],
+                    width: 2
+                }
+            });
+
+            const pointGraphic = new Graphic({
+                geometry: point,
+                symbol: markerSymbol                
+            });
+
+            graphicsLayer.add(pointGraphic);
+
+            // Add a div element for the pulsing effect
+            const pulseDiv = document.createElement("div");
+            pulseDiv.className = "pulse2";
+            view.ui.add(pulseDiv, "manual");
+
+            // Update the position of the pulseDiv on view changes
+            view.watch("extent", () => {
+                const screenPoint = view.toScreen(point);
+                const offsetX = -20; // Adjust this value to move slightly to the left
+                const offsetY = -20; // Adjust this value to move slightly up
+                pulseDiv.style.left = `${screenPoint.x + offsetX}px`;
+                pulseDiv.style.top = `${screenPoint.y + offsetY}px`;
+            });
+
+            // Create a text symbol for the label
+            const textSymbol = new TextSymbol({
+                text: "You are here!",
+                color: "black",
+                haloColor: "white",
+                haloSize: "1px",
+                font: {
+                    size: 12,
+                    family: "sans-serif",
+                    weight: "bold"
+                },
+                yoffset: 20  // Adjust the offset to position the label above the marker
+            });
+
+            // Create a graphic for the label and add the point and text symbol to it
+            const labelGraphic = new Graphic({
+                geometry: point,
+                symbol: textSymbol
+            });
+
+            // Add the label graphic to the graphics layer
+            graphicsLayer.add(labelGraphic);
+
+            $("#addloc").click(function(){ 
+              toast.isOpen = true;
+              // Add event listener for the "hold" event and keep a reference to the handler
+              var holdEventHandler = view.on("hold", handleHoldEvent);
+              function handleHoldEvent(evt) {                
+                var lat = evt.mapPoint.latitude
+                var lon = evt.mapPoint.longitude    
+
+                // Create a point geometry
+                var point = new Point({
+                  latitude: lat,
+                  longitude: lon
                 }); 
 
-                const markerSymbol = new SimpleMarkerSymbol({
-                    color: [250, 205, 1, 1],
-                    size: "20px",
-                    outline: {
-                        color: [255, 255, 255, 1],
-                        width: 2
-                    }
+                 // Create the attributes for the new feature
+                var attributes = {
+                  studyyear: 2024
+                };
+
+                // Create the new feature
+                var newFeature = new Graphic({
+                  geometry: point,
+                  attributes: attributes
                 });
 
-                const pointGraphic = new Graphic({
-                    geometry: point,
-                    symbol: markerSymbol                
-                });
+                // Use applyEdits to add the new feature to the feature layer
+                studentsLayer.applyEdits({
+                  addFeatures: [newFeature]
+                }).then(function(result) {
+                  if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
+                    console.log("Feature added successfully!");
+                    toast.isOpen = false;
+                    alert.isOpen = true;
 
-                graphicsLayer.add(pointGraphic);
+                    // Refresh the feature layer to show the new feature
+                    studentsLayer.refresh();
 
-                // Add a div element for the pulsing effect
-                const pulseDiv = document.createElement("div");
-                pulseDiv.className = "pulse2";
-                view.ui.add(pulseDiv, "manual");
-
-                // Update the position of the pulseDiv on view changes
-                view.watch("extent", () => {
-                    const screenPoint = view.toScreen(point);
-                    const offsetX = -20; // Adjust this value to move slightly to the left
-                    const offsetY = -20; // Adjust this value to move slightly up
-                    pulseDiv.style.left = `${screenPoint.x + offsetX}px`;
-                    pulseDiv.style.top = `${screenPoint.y + offsetY}px`;
-                });
-
-                // Create a text symbol for the label
-                const textSymbol = new TextSymbol({
-                    text: "You are here!",
-                    color: "black",
-                    haloColor: "white",
-                    haloSize: "1px",
-                    font: {
-                        size: 12,
-                        family: "sans-serif",
-                        weight: "bold"
-                    },
-                    yoffset: 20  // Adjust the offset to position the label above the marker
-                });
-
-                // Create a graphic for the label and add the point and text symbol to it
-                const labelGraphic = new Graphic({
-                    geometry: point,
-                    symbol: textSymbol
-                });
-
-                // Add the label graphic to the graphics layer
-                graphicsLayer.add(labelGraphic);
-
-                $("#addloc").click(function(){ 
-                  toast.isOpen = true;
-                  // Add event listener for the "hold" event and keep a reference to the handler
-                  var holdEventHandler = view.on("hold", handleHoldEvent);
-                  function handleHoldEvent(evt) {                
-                    var lat = evt.mapPoint.latitude
-                    var lon = evt.mapPoint.longitude    
-
-                    // Create a point geometry
-                    var point = new Point({
-                      latitude: lat,
-                      longitude: lon
-                    }); 
-
-                     // Create the attributes for the new feature
-                    var attributes = {
-                      studyyear: 2024
-                    };
-
-                    // Create the new feature
-                    var newFeature = new Graphic({
-                      geometry: point,
-                      attributes: attributes
-                    });
-
-                    // Use applyEdits to add the new feature to the feature layer
-                    studentsLayer.applyEdits({
-                      addFeatures: [newFeature]
-                    }).then(function(result) {
-                      if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
-                        console.log("Feature added successfully!");
-                        toast.isOpen = false;
-                        alert.isOpen = true;
-
-                        // Refresh the feature layer to show the new feature
-                        studentsLayer.refresh();
-
-                        // Remove the hold event listener
-                        holdEventHandler.remove();
-                      } else {
-                        console.error("Error adding feature:", result.addFeatureResults[0].error);
-                      }
-                    }).catch(function(error) {
-                      console.error("Error applying edits:", error);
-                    });
+                    // Remove the hold event listener
+                    holdEventHandler.remove();
+                  } else {
+                    console.error("Error adding feature:", result.addFeatureResults[0].error);
                   }
+                }).catch(function(error) {
+                  console.error("Error applying edits:", error);
                 });
-                
-              toast.addEventListener('didDismiss', () => {
-                toast.isOpen = false;
-              });
+              }
+            });
+            
+          toast.addEventListener('didDismiss', () => {
+            toast.isOpen = false;
+          });
 
-              alert.addEventListener('ionAlertDidDismiss', () => {
-                alert.isOpen = false;
-              });
+          alert.addEventListener('ionAlertDidDismiss', () => {
+            alert.isOpen = false;
+          });
       });
     </script>
 </head>
