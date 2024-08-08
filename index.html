@@ -114,15 +114,14 @@
             
         }
 
-
-#addloc {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  padding: 10px;
-}
+        #addloc {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          padding: 10px;
+        }
     </style>
 
     <script>
@@ -145,7 +144,7 @@
 
             // Remove the pulse after the animation completes
             pulse.addEventListener('animationend', function() {
-                pulse.remove();
+              pulse.remove();
             });
 
             // Handle ion-card elements with onclick handlers
@@ -180,19 +179,20 @@
             "esri/layers/GraphicsLayer",
             "esri/layers/FeatureLayer",
             "esri/widgets/CoordinateConversion",
-            "esri/symbols/TextSymbol"], function(esriConfig, Map, MapView, Graphic, Point, SimpleMarkerSymbol, GraphicsLayer, FeatureLayer, CoordinateConversion, TextSymbol) {
+            "esri/symbols/TextSymbol",
+            "esri/widgets/Home"], function(esriConfig, Map, MapView, Graphic, Point, SimpleMarkerSymbol, GraphicsLayer, FeatureLayer, CoordinateConversion, TextSymbol, Home) {
        
             const toast = document.querySelector('ion-toast');
             const alert = document.querySelector('ion-alert');
 
             alert.buttons = [
-                {
+                /*{
                   text: 'Cancel',
                   role: 'cancel',
                   handler: () => {
                     console.log('Alert canceled');
                   },
-                },
+                },*/
                 {
                   text: 'OK',
                   role: 'confirm',
@@ -356,6 +356,13 @@
           alert.addEventListener('ionAlertDidDismiss', () => {
             alert.isOpen = false;
           });
+
+           const homeBtn = new Home({
+          view: view
+        });
+
+        // Add the home button to the top left corner of the view
+        view.ui.add(homeBtn, "top-left");
       });
     </script>
 </head>
@@ -372,7 +379,7 @@
         </ion-header>
         <ion-content>           
             <div id="viewDiv"></div> 
-            <ion-toast duration="5000000" message="Press and hold on your home location on the map to drop a pin." icon="location" position="top" color="danger"></ion-toast>  
+            <ion-toast duration="5000000" message="Zoom in and press and hold on your home location on the map to drop a pin." icon="location" position="top" color="danger"></ion-toast>  
             <ion-alert header="Success! Your home location has been added to the map."></ion-alert> 
              <ion-fab slot="fixed" vertical="top" horizontal="end">
                 <ion-fab-button color="danger" id="addloc" style="height: 125px; width: 125px;">
