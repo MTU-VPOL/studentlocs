@@ -113,6 +113,16 @@
         .alert-wrapper.sc-ion-alert-md {
             
         }
+
+
+#addloc {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 10px;
+}
     </style>
 
     <script>
@@ -364,12 +374,13 @@
             <div id="viewDiv"></div> 
             <ion-toast duration="5000000" message="Press and hold on your home location on the map to drop a pin." icon="location" position="top" color="danger"></ion-toast>  
             <ion-alert header="Success! Your home location has been added to the map."></ion-alert> 
-             <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-                <ion-fab-button color="danger" id="addloc">
-                  <ion-icon name="location" size="large"></ion-icon>
+             <ion-fab slot="fixed" vertical="top" horizontal="end">
+                <ion-fab-button color="danger" id="addloc" style="height: 125px; width: 125px;">
+                   <!--  <ion-icon name="location" size="large"></ion-icon> -->
+                    <h4> Add Your </br> Location</h4></ion-fab>                  
                 </ion-fab-button>
             </ion-fab>          
-            <ion-fab>
+           
          
         </ion-content>
     </ion-app>
