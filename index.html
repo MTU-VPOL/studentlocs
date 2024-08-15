@@ -11,7 +11,7 @@
     <script src="https://js.arcgis.com/4.30/"></script>
     <script type="module" src="https://js.arcgis.com/map-components/4.30/arcgis-map-components.esm.js"></script>
 
-    <title>Where Our Students are From</title>
+    <title>Where Do Huskies Come From?</title>
 
     <style>
        /* :root {
@@ -209,9 +209,13 @@
             const view = new MapView({
               map: map,
               center: [0, 0], // Longitude, latitude
-              zoom: 2, // Zoom level
+              zoom: 2, // Zoom level              
               container: "viewDiv" // Div element
             });
+
+           view.constraints = {
+                minZoom: 2
+            };
 
             const simpleMarkerSymbol = {
               type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
@@ -223,6 +227,8 @@
               },
               size: "24px",
             };
+
+
 
             const pin = {
               type: "simple",
@@ -374,8 +380,7 @@
                  <ion-buttons slot="start">
                     <ion-img src="vpoldark.jpg" style="width: 60px; height: 60px;"></ion-img>
                 </ion-buttons>  
-                <ion-title>Where our students are from</ion-title>
-            </ion-toolbar>
+                <ion-title>Where Do Huskies Come From?
         </ion-header>
         <ion-content>           
             <div id="viewDiv"></div> 
