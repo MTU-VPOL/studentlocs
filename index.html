@@ -127,6 +127,15 @@
         width: 2rem;
         height: 3rem;   
         }
+
+        ion-modal {
+         --height: 70vh; !important /* 70% of the viewport height */
+        }
+
+        #submit {
+            margin-top: 20px;
+        }
+
     </style>
 
     <script>
@@ -443,8 +452,7 @@
                 </ion-list>
                  <ion-toolbar>
                     <ion-button color="danger" slot="end" id="submit" size="large">SUBMIT</ion-button>
-                     </ion-toolbar>
-                  
+                     </ion-toolbar>                  
               </ion-content>
             </ion-modal>
         </ion-content>
