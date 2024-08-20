@@ -61,7 +61,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 9999;
+            z-index: 99999999999999999999999999999999;
             pointer-events: none; /* Allow clicks to pass through */
         }
 
@@ -122,6 +122,11 @@
           text-align: center;
           padding: 10px;
         }
+
+       ion-radio.radio-checked::part(mark) {
+        width: 2rem;
+        height: 3rem;   
+        }
     </style>
 
     <script>
@@ -169,6 +174,8 @@
                 }, 300);  // Adjust the delay as needed for the pulse animation to be visible
             }
         });
+
+
         // ** Esri web map ** //
         require(["esri/config",
             "esri/Map",
@@ -184,6 +191,8 @@
        
             const toast = document.querySelector('ion-toast');
             const alert = document.querySelector('ion-alert');
+            var modal = document.querySelector('ion-modal');
+        
 
             alert.buttons = [
                 /*{
@@ -307,69 +316,90 @@
             // Add the label graphic to the graphics layer
             graphicsLayer.add(labelGraphic);
 
-            $("#addloc").click(function(){ 
-              toast.isOpen = true;
-              // Add event listener for the "hold" event and keep a reference to the handler
-              var holdEventHandler = view.on("hold", handleHoldEvent);
-              function handleHoldEvent(evt) {                
-                var lat = evt.mapPoint.latitude
-                var lon = evt.mapPoint.longitude    
+            $(document).ready(function() {
+              let holdEventHandler;
+              let point;  // Declare this variable outside so it's accessible within the submit click handler
 
-                // Create a point geometry
-                var point = new Point({
-                  latitude: lat,
-                  longitude: lon
-                }); 
+              $("#addloc").click(function() {
+                toast.isOpen = true;
 
-                 // Create the attributes for the new feature
-                var attributes = {
-                  studyyear: 2024
-                };
+                // Add event listener for the "hold" event
+                holdEventHandler = view.on("hold", function(evt) {
+                  var lat = evt.mapPoint.latitude;
+                  var lon = evt.mapPoint.longitude;
 
-                // Create the new feature
-                var newFeature = new Graphic({
-                  geometry: point,
-                  attributes: attributes
+                  // Create a point geometry
+                  point = new Point({
+                    latitude: lat,
+                    longitude: lon
+                  });
+
+                  modal.isOpen = true;
+                  toast.isOpen = false;
                 });
+              });
 
-                // Use applyEdits to add the new feature to the feature layer
-                studentsLayer.applyEdits({
-                  addFeatures: [newFeature]
-                }).then(function(result) {
-                  if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
-                    console.log("Feature added successfully!");
-                    toast.isOpen = false;
-                    alert.isOpen = true;
+              $("#submit").click(function() {
+                if (point) {
+                  const selectedValue = $("#choice").val();
+                  console.log('Selected value:', selectedValue);
 
-                    // Refresh the feature layer to show the new feature
-                    studentsLayer.refresh();
+                  // Create the attributes for the new feature
+                  var attributes = {
+                    studentyear: "F24",
+                    reason: selectedValue
+                  };
 
-                    // Remove the hold event listener
-                    holdEventHandler.remove();
-                  } else {
-                    console.error("Error adding feature:", result.addFeatureResults[0].error);
-                  }
-                }).catch(function(error) {
-                  console.error("Error applying edits:", error);
-                });
-              }
+                  // Create the new feature
+                  var newFeature = new Graphic({
+                    geometry: point,
+                    attributes: attributes
+                  });
+
+                  // Use applyEdits to add the new feature to the feature layer
+                  studentsLayer.applyEdits({
+                    addFeatures: [newFeature]
+                  }).then(function(result) {
+                    if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
+                      console.log("Feature added successfully!");
+
+                      modal.isOpen = false;
+                      alert.isOpen = true;
+
+                      // Refresh the feature layer to show the new feature
+                      studentsLayer.refresh();
+
+                      // Remove the hold event listener
+                      if (holdEventHandler) {
+                        holdEventHandler.remove();
+                      }
+                    } else {
+                      console.error("Error adding feature:", result.addFeatureResults[0].error);
+                    }
+                  }).catch(function(error) {
+                    console.error("Error applying edits:", error);
+                  });
+                } else {
+                  console.error("No location selected yet.");
+                }
+              });
             });
-            
-          toast.addEventListener('didDismiss', () => {
+                        
+            toast.addEventListener('didDismiss', () => {
             toast.isOpen = false;
-          });
+            });
 
-          alert.addEventListener('ionAlertDidDismiss', () => {
+            alert.addEventListener('ionAlertDidDismiss', () => {
             alert.isOpen = false;
-          });
+            });
 
-           const homeBtn = new Home({
-          view: view
+            const homeBtn = new Home({
+            view: view
+            });
+
+            // Add the home button to the top left corner of the view
+            view.ui.add(homeBtn, "top-left");
         });
-
-        // Add the home button to the top left corner of the view
-        view.ui.add(homeBtn, "top-left");
-      });
     </script>
 </head>
 <body>     
@@ -391,9 +421,31 @@
                    <!--  <ion-icon name="location" size="large"></ion-icon> -->
                     <h4> Add Your </br> Location</h4></ion-fab>                  
                 </ion-fab-button>
-            </ion-fab>          
-           
-         
+            </ion-fab>            
+            <ion-modal trigger="open-modal">
+              <ion-content>
+                <ion-toolbar>
+                  <ion-title><h1>What brought you to Tech?</h1></ion-title>                 
+                </ion-toolbar>
+                <ion-list>
+                  <ion-radio-group value="Something else" mode="ios" id="choice">
+                    <div class="radio-group-horizontal">
+                      <ion-item><ion-radio value="An academic program"><h5>An academic program</h5></ion-radio></ion-item>
+                      <ion-item><ion-radio value="Snow"><h5>Snow</h5></ion-radio></ion-item>
+                      <ion-item><ion-radio value="=Family or friends"><h5>Family or friends</h5></ion-radio></ion-item>
+                      <ion-item><ion-radio value="Research opportunities"><h5>Research Opportunities</h5></ion-radio></ion-item>
+                      <ion-item><ion-radio value="The rad library"><h5>The rad library</h5></ion-radio></ion-item> 
+                      <ion-item><ion-radio value="Student life"><h5>Student life</h5></ion-radio></ion-item>     
+                      <ion-item><ion-radio value="Something else"><h5>Something else!</h5></ion-radio></ion-item>                 
+                    </div>
+                  </ion-radio-group>
+                </ion-list>
+                 <ion-toolbar>
+                    <ion-button color="danger" slot="end" id="submit" size="large">SUBMIT</ion-button>
+                     </ion-toolbar>
+                  
+              </ion-content>
+            </ion-modal>
         </ion-content>
     </ion-app>
 </body>
