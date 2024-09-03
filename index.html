@@ -196,7 +196,8 @@
             "esri/layers/FeatureLayer",
             "esri/widgets/CoordinateConversion",
             "esri/symbols/TextSymbol",
-            "esri/widgets/Home"], function(esriConfig, Map, MapView, Graphic, Point, SimpleMarkerSymbol, GraphicsLayer, FeatureLayer, CoordinateConversion, TextSymbol, Home) {
+            "esri/widgets/Home",
+            "esri/smartMapping/labels/clusters"], function(esriConfig, Map, MapView, Graphic, Point, SimpleMarkerSymbol, GraphicsLayer, FeatureLayer, CoordinateConversion, TextSymbol, Home, clusterLabelCreator) {
        
             const toast = document.querySelector('ion-toast');
             const alert = document.querySelector('ion-alert');
@@ -247,21 +248,52 @@
               size: "24px",
             };
 
-
-
             const pin = {
               type: "simple",
               symbol: simpleMarkerSymbol
             };
 
+            const heatmap = {
+              type: "heatmap",
+              colorStops: [
+                { ratio: 0, color: "rgba(0, 0, 0, 0)" },          // Transparent
+                { ratio: 0.2, color: "rgba(255, 255, 255, 0.7)" }, // Light transparent white
+                { ratio: 0.4, color: "rgba(255, 255, 0, 0.7)" },  // Transparent Yellow
+                { ratio: 0.6, color: "rgba(255, 140, 0, 0.7)" },  // Transparent Orange
+                { ratio: 0.8, color: "rgba(255, 69, 0, 0.7)" },   // Transparent Red-Orange
+                { ratio: 1, color: "rgba(255, 0, 0, 0.7)" }       // Transparent Red
+              ],              
+              blurRadius: 15,
+              maxDensity: 0.01,
+              minDensity: 0
+            };
+
+            // Define the custom popup template
+            var popupTemplate = {
+              title: "Husky Location",
+              content: "<b>Reason for coming to Michigan Tech:</b> {reason}"
+            };
+
             // Add the feature layer for the student locations
             var studentsLayer = new FeatureLayer({
               url: "https://services2.arcgis.com/RPhrOu9XQzI31xTa/arcgis/rest/services/Student_locations_2014/FeatureServer/0",
-              renderer: pin
+              renderer: pin,
+              visible: true,
+              popupTemplate: popupTemplate
             });
 
             // Add the feature layer to the map
             map.add(studentsLayer);
+
+            // Add a heat map layer
+            var hmLayer = new FeatureLayer({
+              url: "https://services2.arcgis.com/RPhrOu9XQzI31xTa/arcgis/rest/services/Student_locations_2014/FeatureServer/0",
+              renderer: heatmap,
+              visible: true
+            });
+
+            map.add(hmLayer);
+
             const graphicsLayer = new GraphicsLayer();
             map.add(graphicsLayer);
 
@@ -287,129 +319,288 @@
                 symbol: markerSymbol                
             });
 
-            graphicsLayer.add(pointGraphic);
+            graphicsLayer.add(pointGraphic);       
 
-            // Add a div element for the pulsing effect
-            const pulseDiv = document.createElement("div");
-            pulseDiv.className = "pulse2";
-            view.ui.add(pulseDiv, "manual");
+             view.when(function() {
+    if (view.zoom <= 7) {
+      hmLayer.visible = true;
+      studentsLayer.visible = false;
+    } else {
+      hmLayer.visible = false;
+      studentsLayer.visible = true;
+    }
+  });
 
-            // Update the position of the pulseDiv on view changes
-            view.watch("extent", () => {
-                const screenPoint = view.toScreen(point);
-                const offsetX = -20; // Adjust this value to move slightly to the left
-                const offsetY = -20; // Adjust this value to move slightly up
-                pulseDiv.style.left = `${screenPoint.x + offsetX}px`;
-                pulseDiv.style.top = `${screenPoint.y + offsetY}px`;
-            });
+  // Watch the zoom level and adjust layer visibility accordingly
+  view.watch("zoom", function(zoom) {
+    if (zoom <= 7) {
+      hmLayer.visible = true;
+      studentsLayer.visible = false;
+    } else if (zoom >= 8) {
+      hmLayer.visible = false;
+      studentsLayer.visible = true;
+    }
+  });
 
-            // Create a text symbol for the label
-            const textSymbol = new TextSymbol({
-                text: "You are here!",
-                color: "black",
-                haloColor: "white",
-                haloSize: "1px",
-                font: {
-                    size: 12,
-                    family: "sans-serif",
-                    weight: "bold"
-                },
-                yoffset: 20  // Adjust the offset to position the label above the marker
-            });
 
-            // Create a graphic for the label and add the point and text symbol to it
-            const labelGraphic = new Graphic({
-                geometry: point,
-                symbol: textSymbol
-            });
+           /* // code for marker clusters
+            studentsLayer
+          .when()
+          .then(generateClusterConfig)
+          .then(async (featureReduction) => {
+            // sets generated cluster configuration on the layer
+            studentsLayer.featureReduction = featureReduction;
+          })
+          .catch((error) => {
+            console.error(error);
+          });
 
-            // Add the label graphic to the graphics layer
-            graphicsLayer.add(labelGraphic);
+        async function generateClusterConfig(layer) {
+          let popupTemplate = {
+            title: "Area summary",
+            content: [
+              {
+                type: "text",
+                text: "<b>{cluster_count}</b> Huskies come from this area. The following lists the most popular reasons they gave for coming to Michigan Tech."
+              },
+              {
+                type: "expression",
+                // lists the top 5 most common fuel types
+                expressionInfo: {
+                  expression: `
+                  Expects($aggregatedFeatures, "reason")
 
-            $(document).ready(function() {
-              let holdEventHandler;
-              let point;  // Declare this variable outside so it's accessible within the submit click handler
+                  var statsFS = GroupBy($aggregatedFeatures,
+                    [
+                      { name: 'Type', expression: 'reason'},
+                    ],
+                    [
+                      { name: 'num_features', expression: '1', statistic: 'COUNT' }
+                    ]
+                  );
+                  var ordered = Top(OrderBy(statsFs, 'num_features DESC'), 8);
 
-              $("#addloc").click(function() {
-                toast.isOpen = true;
+                  // create an HTML ordered list as a string and return in a rich text element
+                  var list = "<ol>";
 
-                // Add event listener for the "hold" event
-                holdEventHandler = view.on("hold", function(evt) {
-                  var lat = evt.mapPoint.latitude;
-                  var lon = evt.mapPoint.longitude;
+                  for (var group in ordered){
+                    list += \`<li>\${group.Type} (\${Text(group.num_features, "#,###")})</li>\`
+                  }
+                  list += "</ol>";
 
-                  // Create a point geometry
-                  point = new Point({
-                    latitude: lat,
-                    longitude: lon
-                  });
-
-                  modal.isOpen = true;
-                  toast.isOpen = false;
-                });
-              });
-
-              $("#submit").click(function() {
-                if (point) {
-                  const selectedValue = $("#choice").val();
-                  console.log('Selected value:', selectedValue);
-
-                  // Create the attributes for the new feature
-                  var attributes = {
-                    studentyear: "F24",
-                    reason: selectedValue
-                  };
-
-                  // Create the new feature
-                  var newFeature = new Graphic({
-                    geometry: point,
-                    attributes: attributes
-                  });
-
-                  // Use applyEdits to add the new feature to the feature layer
-                  studentsLayer.applyEdits({
-                    addFeatures: [newFeature]
-                  }).then(function(result) {
-                    if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
-                      console.log("Feature added successfully!");
-
-                      modal.isOpen = false;
-                      alert.isOpen = true;
-
-                      // Refresh the feature layer to show the new feature
-                      studentsLayer.refresh();
-
-                      // Remove the hold event listener
-                      if (holdEventHandler) {
-                        holdEventHandler.remove();
-                      }
-                    } else {
-                      console.error("Error adding feature:", result.addFeatureResults[0].error);
-                    }
-                  }).catch(function(error) {
-                    console.error("Error applying edits:", error);
-                  });
-                } else {
-                  console.error("No location selected yet.");
+                  return {
+                    type: "text",
+                    text: list
+                  }
+                `,
+                  title: "List of reasons for coming to MTU"
                 }
-              });
-            });
-                        
-            toast.addEventListener('didDismiss', () => {
-            toast.isOpen = false;
-            });
+              },
+              {
+                // creates two pie charts; one for summarizing each fuel
+                // type by count; the other for each fuel type by capacity
+                type: "expression",
+                expressionInfo: {
+                  expression: `
+                  Expects($aggregatedFeatures, "reason");
+                  var attributes = {};
+                  var countFieldNames = [];
+                  var capacityFieldNames = [];
+                  var rendererColors = {
+                    Snow: [166,206,227], 
+                    'Family or friends': [178,223,138], 
+                    'Student life': [51,160,44], 
+                    'The rad library': [251,154,153], 
+                    'Research opportunities': [227,26,28], 
+                    'Something else': [253,191,111], 
+                    'An academic program': [255,127,0]                    
+                  };
+                  
+                  var chartColors = [];
 
-            alert.addEventListener('ionAlertDidDismiss', () => {
-            alert.isOpen = false;
-            });
+                  var types = Distinct($aggregatedFeatures, "reason");
+                  for(var t in types){
+                    var type = t.reason;
+                    var filtered = Filter($aggregatedFeatures, "reason = @type");
+                    var color = iif(hasValue(rendererColors, type), rendererColors[type], [128,128,128,255]);
 
-            const homeBtn = new Home({
-            view: view
-            });
+                    var countFieldName = type + " count";
+                    attributes[countFieldName] = Count(filtered);
+  
+                    var capacityFieldName = type + " capacity (mW)";
+                    attributes[capacityFieldName] = DefaultValue(Sum(filtered, "capacity_mw"), 0);
+    
+                    Push(countFieldNames, countFieldName);
+                    Push(capacityFieldNames, capacityFieldName);
+                    Push(chartColors, color);
+                  }
 
-            // Add the home button to the top left corner of the view
-            view.ui.add(homeBtn, "top-left");
+                  return {
+                    type: "media",
+                    attributes: attributes,
+                    title: "Reason for coming to MTU",
+                    mediaInfos: [{
+                      type: "piechart",
+                      title: "Total count",
+                      value: {
+                        fields: countFieldNames,
+                        colors: chartColors
+                      }
+                    }]
+                  }
+                `,
+                  title: "Pie charts"
+                }
+              }
+            ]
+          };
+
+          // generates default labelingInfo
+          const { labelingInfo, clusterMinSize } = await clusterLabelCreator
+            .getLabelSchemes({
+              layer,
+              view
+            })
+            .then((labelSchemes) => labelSchemes.primaryScheme);
+
+          return {
+            type: "cluster",
+            popupTemplate,
+            labelingInfo,
+            clusterMinSize,
+             symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: "#23aae2",
+            outline: {
+              color: "rgba(255, 255, 255, 1)",
+              width: 2
+            }
+          },
+          };
+        }*/
+
+        // Add a div element for the pulsing effect
+        const pulseDiv = document.createElement("div");
+        pulseDiv.className = "pulse2";
+        view.ui.add(pulseDiv, "manual");
+
+        // Update the position of the pulseDiv on view changes
+        view.watch("extent", () => {
+            const screenPoint = view.toScreen(point);
+            const offsetX = -20; // Adjust this value to move slightly to the left
+            const offsetY = -20; // Adjust this value to move slightly up
+            pulseDiv.style.left = `${screenPoint.x + offsetX}px`;
+            pulseDiv.style.top = `${screenPoint.y + offsetY}px`;
         });
+
+        // Create a text symbol for the label
+        const textSymbol = new TextSymbol({
+            text: "You are here!",
+            color: "black",
+            haloColor: "white",
+            haloSize: "1px",
+            font: {
+                size: 12,
+                family: "sans-serif",
+                weight: "bold"
+            },
+            yoffset: 20  // Adjust the offset to position the label above the marker
+        });
+
+        // Create a graphic for the label and add the point and text symbol to it
+        const labelGraphic = new Graphic({
+            geometry: point,
+            symbol: textSymbol
+        });
+
+        // Add the label graphic to the graphics layer
+        graphicsLayer.add(labelGraphic);
+
+        $(document).ready(function() {
+          let holdEventHandler;
+          let point;  // Declare this variable outside so it's accessible within the submit click handler
+
+          $("#addloc").click(function() {
+            toast.isOpen = true;
+
+            // Add event listener for the "hold" event
+            holdEventHandler = view.on("hold", function(evt) {
+              var lat = evt.mapPoint.latitude;
+              var lon = evt.mapPoint.longitude;
+
+              // Create a point geometry
+              point = new Point({
+                latitude: lat,
+                longitude: lon
+              });
+
+              modal.isOpen = true;
+              toast.isOpen = false;
+            });
+          });
+
+          $("#submit").click(function() {
+            if (point) {
+              const selectedValue = $("#choice").val();
+              console.log('Selected value:', selectedValue);
+
+              // Create the attributes for the new feature
+              var attributes = {
+                studentyear: "F24",
+                reason: selectedValue
+              };
+
+              // Create the new feature
+              var newFeature = new Graphic({
+                geometry: point,
+                attributes: attributes
+              });
+
+              // Use applyEdits to add the new feature to the feature layer
+              studentsLayer.applyEdits({
+                addFeatures: [newFeature]
+              }).then(function(result) {
+                if (result.addFeatureResults.length > 0 && !result.addFeatureResults[0].error) {
+                  console.log("Feature added successfully!");
+
+                  modal.isOpen = false;
+                  alert.isOpen = true;
+
+                  // Refresh the feature layer to show the new feature
+                  studentsLayer.refresh();
+
+                  // Remove the hold event listener
+                  if (holdEventHandler) {
+                    holdEventHandler.remove();
+                  }
+                } else {
+                  console.error("Error adding feature:", result.addFeatureResults[0].error);
+                }
+              }).catch(function(error) {
+                console.error("Error applying edits:", error);
+              });
+            } else {
+              console.error("No location selected yet.");
+            }
+          });
+        });
+                    
+        toast.addEventListener('didDismiss', () => {
+        toast.isOpen = false;
+        });
+
+        alert.addEventListener('ionAlertDidDismiss', () => {
+        alert.isOpen = false;
+        });
+
+        const homeBtn = new Home({
+        view: view
+        });
+
+        // Add the home button to the top left corner of the view
+        view.ui.add(homeBtn, "top-left");
+    });
     </script>
 </head>
 <body>     
